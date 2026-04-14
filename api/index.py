@@ -136,14 +136,18 @@ async def upload_csv(file: UploadFile = File(...)):
                 continue
             row[header_mapping.get(orig_key, orig_key)] = (value or "").strip().strip('"')
 
-        if not row.get("prev"):
+        prev     = row.get("prev", "")
+        incoming = row.get("incoming", "")
+
+        # Skip rows where outgoing == incoming — not a real instructor change
+        if not prev or prev.strip().lower() == incoming.strip().lower():
             continue
 
         rows.append({
             "batch":      row.get("batch", ""),
             "module":     row.get("module", ""),
-            "prev":       row.get("prev", ""),
-            "incoming":   row.get("incoming", ""),
+            "prev":       prev,
+            "incoming":   incoming,
             "firstClass": _normalise_date(row.get("firstClass", "")),
             "lastClass":  _normalise_date(row.get("lastClass", "")),
         })
@@ -187,15 +191,18 @@ async def sync_from_sheet():
         def g(key: str) -> str:
             return str(record.get(key, "") or "").strip()
 
-        prev = g("prev_module_instructor")
-        if not prev:
+        prev     = g("prev_module_instructor")
+        incoming = g("instructor_email")
+
+        # Skip rows where outgoing == incoming — not a real instructor change
+        if not prev or prev.strip().lower() == incoming.strip().lower():
             continue
 
         rows.append({
             "batch":               g("super_batch_name"),
             "module":              g("module_name"),
             "prev_instructor":     prev,
-            "incoming_instructor": g("instructor_email"),
+            "incoming_instructor": incoming,
             "first_class":         _normalise_date(g("first_class_taken_at")) or None,
             "last_class":          _normalise_date(g("last_class_taken_at"))  or None,
         })

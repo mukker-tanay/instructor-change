@@ -1328,9 +1328,12 @@
                 const rawRows = [];
                 lines.slice(1).forEach(line => {
                     const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
-                    const prev = cols[iP] || ''; if (!prev) return;
+                    const prev = cols[iP] || '';
+                    const incoming = cols[iE] || '';
+                    // skip if no prev instructor, or both instructors are the same
+                    if (!prev || prev.toLowerCase() === incoming.toLowerCase()) return;
                     rawRows.push({
-                        batch: cols[iB], module: cols[iM], prev, incoming: cols[iE],
+                        batch: cols[iB], module: cols[iM], prev, incoming,
                         firstClass: cols[iF] ? new Date(cols[iF]).toISOString().slice(0, 10) : '',
                         lastClass: cols[iLa] ? new Date(cols[iLa]).toISOString().slice(0, 10) : '',
                     });
