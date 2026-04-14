@@ -1359,16 +1359,22 @@
         // ── Supabase / Sheet integration ───────────────────────────────────
 
         function loadFromSupabase() {
+            toast('Loading data…');
             fetch('/api/rows')
-                .then(res => { if (!res.ok) throw new Error('api/rows ' + res.status); return res.json(); })
+                .then(res => {
+                    if (!res.ok) return res.json().then(d => { throw new Error(d.detail || 'api/rows ' + res.status); });
+                    return res.json();
+                })
                 .then(data => {
                     if (data.rows && data.rows.length) {
                         batchsets = groupRows(data.rows);
                         renderAll();
-                        toast('Loaded ' + data.rows.length + ' rows from Supabase → ' + batchsets.length + ' batchsets');
+                        toast('Loaded ' + data.rows.length + ' rows → ' + batchsets.length + ' batchsets');
+                    } else {
+                        toast('No data in Supabase yet — click Sync from Sheet');
                     }
                 })
-                .catch(err => console.info('Supabase not configured or unavailable:', err));
+                .catch(err => toast('Auto-load failed: ' + err.message));
         }
 
         function syncSheet() {
