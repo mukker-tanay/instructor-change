@@ -83,10 +83,19 @@ def _get_gspread_client():
     raw = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
     if not raw:
         raise HTTPException(status_code=500, detail="GOOGLE_CREDENTIALS_JSON env var not set.")
-    creds_dict = json.loads(raw)
+    try:
+        creds_dict = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"GOOGLE_CREDENTIALS_JSON is not valid JSON: {e}")
     scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    return gspread.authorize(creds)
+    try:
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build credentials from service account JSON: {e}")
+    try:
+        return gspread.authorize(creds)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"gspread.authorize failed: {e}")
 
 
 def _rows_to_db_records(rows: list[dict]) -> list[dict]:
@@ -178,13 +187,25 @@ async def sync_from_sheet():
 
     try:
         gc = _get_gspread_client()
-        sh = gc.open_by_key(sheet_id)
-        worksheet = sh.worksheet("dump")
-        records = worksheet.get_all_records()   # list of dicts keyed by header row
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Google Sheets error: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to create Google Sheets client: {e}")
+
+    try:
+        sh = gc.open_by_key(sheet_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to open sheet '{sheet_id}'. Is the sheet shared with the service account? Error: {e}")
+
+    try:
+        worksheet = sh.worksheet("dump")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Tab 'dump' not found in the sheet. Available tabs: {[ws.title for ws in sh.worksheets()]}. Error: {e}")
+
+    try:
+        records = worksheet.get_all_records()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to read rows from 'dump' tab: {e}")
 
     rows = []
     for record in records:
@@ -246,6 +267,33 @@ async def get_rows():
     ]
 
     return JSONResponse(content={"rows": rows, "total": len(rows)})
+
+
+# ---------------------------------------------------------------------------
+# GET /api/debug  — check which env vars are configured (no secrets exposed)
+# ---------------------------------------------------------------------------
+@app.get("/api/debug")
+async def debug_config():
+    checks = {
+        "SUPABASE_URL":           bool(os.environ.get("SUPABASE_URL")),
+        "SUPABASE_SERVICE_KEY":   bool(os.environ.get("SUPABASE_SERVICE_KEY")),
+        "GOOGLE_SHEET_ID":        bool(os.environ.get("GOOGLE_SHEET_ID")),
+        "GOOGLE_CREDENTIALS_JSON": bool(os.environ.get("GOOGLE_CREDENTIALS_JSON")),
+    }
+
+    # Try to parse the Google creds JSON
+    raw = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            checks["GOOGLE_CREDS_client_email"] = parsed.get("client_email", "MISSING")
+            checks["GOOGLE_CREDS_has_private_key"] = bool(parsed.get("private_key"))
+        except Exception as e:
+            checks["GOOGLE_CREDS_parse_error"] = str(e)
+
+    checks["GOOGLE_SHEET_ID_value"] = os.environ.get("GOOGLE_SHEET_ID", "")
+
+    return JSONResponse(content=checks)
 
 
 # ---------------------------------------------------------------------------
