@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Instructor change monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f0f11;
+            --surface: #18181c;
+            --surface2: #222228;
+            --surface3: #2a2a32;
+            --border: rgba(255, 255, 255, .07);
+            --border2: rgba(255, 255, 255, .13);
+            --text: #e8e8f0;
+            --muted: #888898;
+            --muted2: #55556a;
+            --accent: #7c6dfa;
+            --accent2: #a78bfa;
+            --red: #f87171;
+            --red-bg: rgba(248, 113, 113, .08);
+            --red-border: rgba(248, 113, 113, .25);
+            --amber: #fbbf24;
+            --amber-bg: rgba(251, 191, 36, .08);
+            --amber-border: rgba(251, 191, 36, .25);
+            --green: #34d399;
+            --green-bg: rgba(52, 211, 153, .08);
+            --blue: #60a5fa;
+            --blue-bg: rgba(96, 165, 250, .08);
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        html {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: 100vh
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column
+        }
+
+        .sidebar-top {
+            padding: 22px 18px 18px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .logo-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent)
+        }
+
+        .logo-name {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: .01em
+        }
+
+        .logo-sub {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+            font-family: 'DM Mono', monospace
+        }
+
+        .nav {
+            padding: 14px 10px;
+            flex: 1
+        }
+
+        .nav-section {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: .08em;
+            color: var(--muted2);
+            text-transform: uppercase;
+            padding: 0 8px;
+            margin: 14px 0 6px
+        }
+
+        .nav-section:first-child {
+            margin-top: 0
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 7px 10px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--muted);
+            transition: all .12s;
+            margin-bottom: 1px;
+            border: none;
+            background: transparent;
+            width: 100%;
+            text-align: left;
+            font-family: 'DM Sans', sans-serif
+        }
+
+        .nav-item:hover {
+            background: var(--surface2);
+            color: var(--text)
+        }
+
+        .nav-item.active {
+            background: rgba(124, 109, 250, .14);
+            color: var(--accent2)
+        }
+
+        .nav-icon {
+            width: 15px;
+            height: 15px;
+            flex-shrink: 0;
+            opacity: .7
+        }
+
+        .nav-count {
+            margin-left: auto;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 10px
+        }
+
+        .nav-count.red {
+            background: var(--red-bg);
+            color: var(--red)
+        }
+
+        .nav-count.amber {
+            background: var(--amber-bg);
+            color: var(--amber)
+        }
+
+        .sidebar-footer {
+            padding: 14px 16px;
+            border-top: 1px solid var(--border)
+        }
+
+        .footer-label {
+            font-size: 10px;
+            color: var(--muted2);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 5px
+        }
+
+        .webhook-input {
+            width: 100%;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            padding: 6px 9px
+        }
+
+        .webhook-input:focus {
+            outline: none;
+            border-color: var(--accent)
+        }
+
+        .webhook-input::placeholder {
+            color: var(--muted2)
+        }
+
+        /* Main */
+        .main {
+            padding: 28px 32px;
+            overflow-x: hidden
+        }
+
+        .page-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 24px
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 600
+        }
+
+        .page-meta {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 4px;
+            font-family: 'DM Mono', monospace
+        }
+
+        .head-actions {
+            display: flex;
+            gap: 8px
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border2);
+            background: var(--surface2);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            transition: all .12s
+        }
+
+        .btn:hover {
+            background: var(--surface3);
+            border-color: rgba(255, 255, 255, .2)
+        }
+
+        .btn.primary {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent)
+        }
+
+        .btn.primary:hover {
+            background: var(--accent2);
+            border-color: var(--accent2)
+        }
+
+        .btn.slack {
+            background: #4a154b;
+            color: #fff;
+            border-color: #4a154b
+        }
+
+        .btn.slack:hover {
+            background: #5e1a60
+        }
+
+        .btn.sm {
+            padding: 4px 10px;
+            font-size: 11px
+        }
+
+        .btn.ghost {
+            background: transparent;
+            border-color: var(--muted2);
+            color: var(--muted)
+        }
+
+        .btn.ghost:hover {
+            color: var(--text);
+            border-color: var(--border2)
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 24px
+        }
+
+        .stat {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 18px
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 8px
+        }
+
+        .stat-value {
+            font-size: 26px;
+            font-weight: 600;
+            line-height: 1
+        }
+
+        .stat-value.blue {
+            color: var(--blue)
+        }
+
+        .stat-value.red {
+            color: var(--red)
+        }
+
+        .stat-value.amber {
+            color: var(--amber)
+        }
+
+        .stat-value.green {
+            color: var(--green)
+        }
+
+        .stat-hint {
+            font-size: 11px;
+            color: var(--muted2);
+            margin-top: 5px
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            flex-wrap: wrap
+        }
+
+        .search-wrap {
+            position: relative;
+            flex: 1;
+            min-width: 180px
+        }
+
+        .search-ico {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            width: 14px;
+            height: 14px
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 13px;
+            padding: 7px 12px 7px 32px;
+            font-family: 'DM Sans', sans-serif
+        }
+
+        .search-input::placeholder {
+            color: var(--muted2)
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent)
+        }
+
+        .pills {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap
+        }
+
+        .pill {
+            padding: 4px 11px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            background: transparent;
+            font-family: 'DM Sans', sans-serif;
+            transition: all .12s
+        }
+
+        .pill:hover {
+            border-color: var(--border2);
+            color: var(--text)
+        }
+
+        .pill.active {
+            border-color: var(--accent);
+            color: var(--accent2);
+            background: rgba(124, 109, 250, .1)
+        }
+
+        /* Batchset cards */
+        .batchset-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px
+        }
+
+        .bs-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 18px;
+            transition: border-color .15s
+        }
+
+        .bs-card:hover {
+            border-color: var(--border2)
+        }
+
+        .bs-card.critical {
+            border-left: 3px solid var(--red)
+        }
+
+        .bs-card.urgent {
+            border-left: 3px solid var(--amber)
+        }
+
+        .bs-card.upcoming {
+            border-left: 3px solid var(--blue)
+        }
+
+        .bs-card.past {
+            border-left: 3px solid var(--muted2);
+            opacity: .6
+        }
+
+        .bs-card.later {
+            border-left: 3px solid var(--green)
+        }
+
+        .bs-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px
+        }
+
+        .bs-module {
+            font-size: 15px;
+            font-weight: 600
+        }
+
+        .bs-meta {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap
+        }
+
+        .badge::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: currentColor
+        }
+
+        .badge-critical {
+            background: var(--red-bg);
+            color: var(--red)
+        }
+
+        .badge-urgent {
+            background: var(--amber-bg);
+            color: var(--amber)
+        }
+
+        .badge-upcoming {
+            background: var(--blue-bg);
+            color: var(--blue)
+        }
+
+        .badge-later {
+            background: var(--green-bg);
+            color: var(--green)
+        }
+
+        .badge-past {
+            background: rgba(255, 255, 255, .04);
+            color: var(--muted)
+        }
+
+        .instr-row {
+            display: grid;
+            grid-template-columns: 1fr 28px 1fr;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 10px;
+            background: var(--surface2);
+            border-radius: 8px;
+            padding: 8px 12px
+        }
+
+        .instr-label {
+            font-size: 10px;
+            color: var(--muted2);
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            letter-spacing: .04em
+        }
+
+        .instr-name {
+            font-size: 12px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
+        .instr-out .instr-name {
+            color: var(--muted)
+        }
+
+        .instr-in .instr-name {
+            color: var(--accent2)
+        }
+
+        .arrow-col {
+            text-align: center;
+            color: var(--muted2);
+            font-size: 14px;
+            padding-top: 14px
+        }
+
+        .batches-section {
+            margin-bottom: 10px
+        }
+
+        .batches-header {
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 5px
+        }
+
+        .batches-header span {
+            color: var(--text);
+            font-weight: 500
+        }
+
+        .batch-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px
+        }
+
+        .batch-tag {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 11px;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace
+        }
+
+        .date-row {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 10px
+        }
+
+        .date-row strong {
+            color: var(--text);
+            font-weight: 500
+        }
+
+        .bs-actions {
+            display: flex;
+            gap: 7px
+        }
+
+        /* Add panel */
+        .add-panel {
+            background: var(--surface);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 14px;
+            display: none
+        }
+
+        .add-panel.show {
+            display: block
+        }
+
+        .add-panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 14px
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px
+        }
+
+        .fg {
+            display: flex;
+            flex-direction: column;
+            gap: 4px
+        }
+
+        .fg label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .06em
+        }
+
+        .fg input {
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 12px;
+            padding: 6px 9px;
+            font-family: 'DM Sans', sans-serif
+        }
+
+        .fg input:focus {
+            outline: none;
+            border-color: var(--accent)
+        }
+
+        .fg input::placeholder {
+            color: var(--muted2)
+        }
+
+        .fg .trigger-note {
+            font-size: 10px;
+            color: var(--accent2);
+            margin-top: 2px
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .65);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100
+        }
+
+        .modal-overlay.show {
+            display: flex
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 14px;
+            width: 500px;
+            max-width: 92vw;
+            overflow: hidden
+        }
+
+        .modal-head {
+            padding: 18px 22px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .modal-title {
+            font-size: 14px;
+            font-weight: 600
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            padding: 2px 6px;
+            border-radius: 4px
+        }
+
+        .modal-close:hover {
+            color: var(--text);
+            background: var(--surface2)
+        }
+
+        .modal-body {
+            padding: 18px 22px
+        }
+
+        .slack-card {
+            background: #1a1d21;
+            border-radius: 8px;
+            padding: 14px 16px;
+            border-left: 4px solid #4a154b;
+            font-family: 'DM Mono', monospace;
+            font-size: 12px
+        }
+
+        .slack-bot {
+            color: #a3a5a8;
+            font-size: 11px;
+            margin-bottom: 8px
+        }
+
+        .slack-bot strong {
+            color: #fff
+        }
+
+        .slack-title {
+            color: #fff;
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 6px
+        }
+
+        .slack-body {
+            color: #c9cccf;
+            font-size: 11px;
+            margin-bottom: 10px
+        }
+
+        .slack-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            border-top: 1px solid rgba(255, 255, 255, .08);
+            padding-top: 10px
+        }
+
+        .sf-label {
+            color: #a3a5a8;
+            font-size: 10px;
+            margin-bottom: 2px
+        }
+
+        .sf-value {
+            color: #e8e8f0;
+            font-size: 12px;
+            font-weight: 500
+        }
+
+        .slack-batches {
+            border-top: 1px solid rgba(255, 255, 255, .08);
+            padding-top: 8px;
+            margin-top: 8px
+        }
+
+        .slack-batch-tag {
+            display: inline-block;
+            background: rgba(255, 255, 255, .06);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            color: #c9cccf;
+            margin: 2px 2px 2px 0
+        }
+
+        .modal-foot {
+            padding: 12px 22px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end
+        }
+
+        /* Empty / toast */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text);
+            color: var(--bg);
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity .2s;
+            pointer-events: none;
+            z-index: 200;
+            white-space: nowrap
+        }
+
+        .toast.show {
+            opacity: 1
+        }
+
+        @media(max-width:860px) {
+            .layout {
+                grid-template-columns: 1fr
+            }
+
+            .sidebar {
+                display: none
+            }
+
+            .stats {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr 1fr
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layout">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-top">
+                <div class="logo">
+                    <div class="logo-dot"></div>
+                    <div>
+                        <div class="logo-name">Instructor monitor</div>
+                        <div class="logo-sub" id="today-label">—</div>
+                    </div>
+                </div>
+            </div>
+            <nav class="nav">
+                <div class="nav-section">Views</div>
+                <button class="nav-item active" onclick="setFilter('all',this,'nav')">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="7" height="7" rx="1" stroke-width="1.5" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" stroke-width="1.5" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" stroke-width="1.5" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" stroke-width="1.5" />
+                    </svg>
+                    All batchsets
+                </button>
+                <button class="nav-item" onclick="setFilter('critical',this,'nav')">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                    Critical ≤7d
+                    <span class="nav-count red" id="cnt-critical">0</span>
+                </button>
+                <button class="nav-item" onclick="setFilter('urgent',this,'nav')">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9" stroke-width="1.5" />
+                        <path stroke-linecap="round" stroke-width="1.5" d="M12 7v5l3 3" />
+                    </svg>
+                    Urgent ≤14d
+                    <span class="nav-count amber" id="cnt-urgent">0</span>
+                </button>
+                <button class="nav-item" onclick="setFilter('upcoming',this,'nav')">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="3" y="4" width="18" height="18" rx="2" stroke-width="1.5" />
+                        <path stroke-linecap="round" stroke-width="1.5" d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                    Upcoming ≤30d
+                </button>
+                <button class="nav-item" onclick="setFilter('past',this,'nav')">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Completed
+                </button>
+                <div class="nav-section">Actions</div>
+                <button class="nav-item" onclick="toggleAddPanel()">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9" stroke-width="1.5" />
+                        <path stroke-linecap="round" stroke-width="1.5" d="M12 8v8M8 12h8" />
+                    </svg>
+                    Add record
+                </button>
+                <button class="nav-item" onclick="importCSV()">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Import CSV
+                </button>
+                <button class="nav-item" onclick="exportCSV()">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export CSV
+                </button>
+                <button class="nav-item" onclick="simulateToday()">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path stroke-linecap="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Simulate today
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="footer-label">Slack webhook</div>
+                <input class="webhook-input" id="webhook-input" placeholder="https://hooks.slack.com/..."
+                    oninput="saveWebhook()">
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main">
+            <div class="page-head">
+                <div>
+                    <div class="page-title">Instructor change monitor</div>
+                    <div class="page-meta" id="page-meta">T-14 alert · trigger on first_class_taken_at</div>
+                </div>
+                <div class="head-actions">
+                    <button class="btn" onclick="loadSample()">Load sample data</button>
+                    <button class="btn slack" onclick="simulateSlackAll()">Send Slack alerts</button>
+                </div>
+            </div>
+
+            <div class="stats" id="stats"></div>
+
+            <div class="add-panel" id="add-panel">
+                <div class="add-panel-title">Add instructor change record</div>
+                <div class="form-grid">
+                    <div class="fg"><label>Batch name</label><input id="f-batch" placeholder="Academy Apr24 Beginner">
+                    </div>
+                    <div class="fg"><label>Module</label><input id="f-module" placeholder="DSA 4.2"></div>
+                    <div class="fg"><label>Classes taken</label><input id="f-classes" type="number" placeholder="12">
+                    </div>
+                    <div class="fg"><label>Outgoing instructor</label><input id="f-prev" placeholder="prev@scaler.com">
+                    </div>
+                    <div class="fg"><label>Incoming instructor</label><input id="f-new" placeholder="new@scaler.com">
+                    </div>
+                    <div class="fg"></div>
+                    <div class="fg">
+                        <label>First class date (incoming)</label>
+                        <input id="f-first" type="date">
+                        <div class="trigger-note">← T-14 trigger fires from this date</div>
+                    </div>
+                    <div class="fg"><label>Last class date (outgoing)</label><input id="f-last" type="date"></div>
+                </div>
+                <div class="panel-actions">
+                    <button class="btn ghost" onclick="toggleAddPanel()">Cancel</button>
+                    <button class="btn primary" onclick="addRecord()">Add record</button>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <div class="search-wrap">
+                    <svg class="search-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="7" stroke-width="1.5" />
+                        <path stroke-linecap="round" stroke-width="1.5" d="M16.5 16.5l4 4" />
+                    </svg>
+                    <input class="search-input" id="search" placeholder="Search module, instructor, batch..."
+                        oninput="renderCards()">
+                </div>
+                <div class="pills">
+                    <button class="pill active" onclick="setFilter('all',this,'pill')">All</button>
+                    <button class="pill" onclick="setFilter('critical',this,'pill')">Critical</button>
+                    <button class="pill" onclick="setFilter('urgent',this,'pill')">Urgent</button>
+                    <button class="pill" onclick="setFilter('upcoming',this,'pill')">Upcoming</button>
+                    <button class="pill" onclick="setFilter('past',this,'pill')">Past</button>
+                </div>
+            </div>
+
+            <div class="batchset-grid" id="batchset-grid"></div>
+        </main>
+    </div>
+
+    <!-- Slack preview modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <div class="modal-head">
+                <div class="modal-title">Slack alert preview</div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="slack-card" id="slack-preview"></div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn ghost" onclick="closeModal()">Close</button>
+                <button class="btn slack" onclick="sendSlack()">Send to Slack</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleCSV(event)">
+
+    <script>
+        const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
+
+        let batchsets = [];
+        let activeFilter = 'all';
+        let previewBS = null;
+
+        const SAMPLE_ROWS = [
+            { batch: 'Academy Apr24 Beginner', module: 'Product Mgmt for SE', prev: 'prashant.deo_1@scaler.com', incoming: 'scaler_instructor33@scaler.com', firstClass: '2026-05-22', lastClass: '2026-05-18', classes: 25 },
+            { batch: 'Academy Apr24 Beginner FE', module: 'Product Mgmt for SE', prev: 'prashant.deo_1@scaler.com', incoming: 'scaler_instructor33@scaler.com', firstClass: '2026-05-22', lastClass: '2026-05-18', classes: 25 },
+            { batch: 'Academy Apr24 Beginner Morning', module: 'Product Mgmt for SE', prev: 'prashant.deo_1@scaler.com', incoming: 'scaler_instructor33@scaler.com', firstClass: '2026-05-22', lastClass: '2026-05-18', classes: 25 },
+            { batch: 'Academy Apr24 Intermediate', module: 'Product Mgmt for SE', prev: 'prashant.deo_1@scaler.com', incoming: 'scaler_instructor33@scaler.com', firstClass: '2026-05-22', lastClass: '2026-05-18', classes: 25 },
+            { batch: 'Academy Apr24 Beginner Morning FE', module: 'DSA 4.2', prev: 'ashay.sinha_1@scaler.com', incoming: 'scaler_instructor56@scaler.com', firstClass: '2026-04-27', lastClass: '2026-04-23', classes: 12 },
+            { batch: 'Academy Apr24 Beginner FE', module: 'DSA 4.2', prev: 'ashay.sinha_1@scaler.com', incoming: 'scaler_instructor56@scaler.com', firstClass: '2026-04-27', lastClass: '2026-04-23', classes: 10 },
+            { batch: 'Academy Apr24 Beginner Morning FE', module: 'Product Mgmt for SE', prev: 'saurabh.kango_1@scaler.com', incoming: 'ashay.sinha_1@scaler.com', firstClass: '2026-04-24', lastClass: '2026-04-20', classes: 13 },
+            { batch: 'Academy Apr24 Advanced', module: 'LLD & Design Patterns', prev: 'rohan.verma@scaler.com', incoming: 'ankit.sharma_2@scaler.com', firstClass: '2026-05-10', lastClass: '2026-05-06', classes: 8 },
+            { batch: 'Academy Apr24 Advanced FE', module: 'LLD & Design Patterns', prev: 'rohan.verma@scaler.com', incoming: 'ankit.sharma_2@scaler.com', firstClass: '2026-05-10', lastClass: '2026-05-06', classes: 7 },
+            { batch: 'Academy Apr24 Advanced Morning', module: 'LLD & Design Patterns', prev: 'rohan.verma@scaler.com', incoming: 'ankit.sharma_2@scaler.com', firstClass: '2026-05-10', lastClass: '2026-05-06', classes: 8 },
+        ];
+
+        function daysTo(dateStr) {
+            const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+            return Math.round((d - TODAY) / 86400000);
+        }
+
+        function urgency(days) {
+            if (days < 0) return 'past';
+            if (days <= 7) return 'critical';
+            if (days <= 14) return 'urgent';
+            if (days <= 30) return 'upcoming';
+            return 'later';
+        }
+
+        function groupRows(rows) {
+            const map = {};
+            rows.forEach(r => {
+                const key = [r.module, r.prev, r.incoming, r.firstClass].join('||');
+                if (!map[key]) {
+                    const days = daysTo(r.firstClass);
+                    map[key] = {
+                        key, module: r.module, prevInstructor: r.prev, instructor: r.incoming,
+                        firstClass: r.firstClass, lastClass: r.lastClass, days, urg: urgency(days), batches: []
+                    };
+                }
+                map[key].batches.push(r.batch);
+            });
+            return Object.values(map).sort((a, b) => a.days - b.days);
+        }
+
+        function loadSample() {
+            batchsets = groupRows(SAMPLE_ROWS);
+            renderAll();
+            toast('Sample data loaded — ' + batchsets.length + ' batchsets');
+        }
+
+        function renderAll() {
+            renderStats();
+            renderCards();
+            document.getElementById('today-label').textContent = TODAY.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            document.getElementById('page-meta').textContent = 'T-14 alert · trigger on first_class_taken_at · ' + batchsets.length + ' batchsets';
+        }
+
+        function renderStats() {
+            const total = batchsets.filter(b => b.days >= 0).length;
+            const critical = batchsets.filter(b => b.days >= 0 && b.days <= 7).length;
+            const urgent = batchsets.filter(b => b.days >= 0 && b.days <= 14).length;
+            const upcoming = batchsets.filter(b => b.days > 14 && b.days <= 30).length;
+
+            document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-label">Total pending</div><div class="stat-value blue">${total}</div><div class="stat-hint">${batchsets.length} batchsets total</div></div>
+    <div class="stat"><div class="stat-label">Critical (≤7 days)</div><div class="stat-value red">${critical}</div><div class="stat-hint">Immediate action</div></div>
+    <div class="stat"><div class="stat-label">Urgent (≤14 days)</div><div class="stat-value amber">${urgent}</div><div class="stat-hint">T-14 window</div></div>
+    <div class="stat"><div class="stat-label">Upcoming (≤30 days)</div><div class="stat-value green">${upcoming}</div><div class="stat-hint">On the radar</div></div>
+  `;
+            document.getElementById('cnt-critical').textContent = critical;
+            document.getElementById('cnt-urgent').textContent = urgent;
+        }
+
+        function fmtDate(s) {
+            if (!s) return '—';
+            return new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        function shortName(email) {
+            return email.replace('@scaler.com', '').replace(/_\d+$/, '').replace(/_/g, ' ');
+        }
+
+        function renderCards() {
+            const q = document.getElementById('search').value.toLowerCase();
+            const filtered = batchsets.filter(b => {
+                const mq = !q || b.module.toLowerCase().includes(q) || b.instructor.toLowerCase().includes(q)
+                    || b.prevInstructor.toLowerCase().includes(q) || b.batches.some(x => x.toLowerCase().includes(q));
+                if (!mq) return false;
+                if (activeFilter === 'all') return true;
+                if (activeFilter === 'critical') return b.days >= 0 && b.days <= 7;
+                if (activeFilter === 'urgent') return b.days >= 0 && b.days <= 14;
+                if (activeFilter === 'upcoming') return b.days > 14 && b.days <= 30;
+                if (activeFilter === 'past') return b.days < 0;
+                return true;
+            });
+
+            const grid = document.getElementById('batchset-grid');
+            if (!filtered.length) { grid.innerHTML = '<div class="empty-state">No batchsets match this filter</div>'; return; }
+
+            window._filtered = filtered;
+
+            grid.innerHTML = filtered.map((b, i) => {
+                const dLabel = b.days < 0 ? Math.abs(b.days) + 'd ago' : b.days + 'd to first class';
+                return `
+    <div class="bs-card ${b.urg}">
+      <div class="bs-top">
+        <div>
+          <div class="bs-module">${b.module}</div>
+          <div class="bs-meta">${b.batches.length} batch${b.batches.length > 1 ? 'es' : ''} · first class ${fmtDate(b.firstClass)}</div>
+        </div>
+        <span class="badge badge-${b.urg}">${dLabel}</span>
+      </div>
+      <div class="instr-row">
+        <div class="instr-out">
+          <div class="instr-label">Outgoing</div>
+          <div class="instr-name" title="${b.prevInstructor}">${shortName(b.prevInstructor)}</div>
+        </div>
+        <div class="arrow-col">→</div>
+        <div class="instr-in" style="text-align:right">
+          <div class="instr-label" style="text-align:right">Incoming</div>
+          <div class="instr-name" title="${b.instructor}">${shortName(b.instructor)}</div>
+        </div>
+      </div>
+      <div class="batches-section">
+        <div class="batches-header">Batches in this set <span>(${b.batches.length})</span></div>
+        <div class="batch-tags">${b.batches.map(x => `<span class="batch-tag">${x}</span>`).join('')}</div>
+      </div>
+      <div class="bs-actions">
+        <button class="btn sm" onclick="previewSlack(${i})">Preview Slack alert</button>
+        <button class="btn sm ghost" onclick="removeBS(${batchsets.indexOf(b)})">Remove</button>
+      </div>
+    </div>`;
+            }).join('');
+        }
+
+        function setFilter(f, el, type) {
+            activeFilter = f;
+            document.querySelectorAll(type === 'nav' ? '.nav-item' : '.pill').forEach(x => x.classList.remove('active'));
+            el.classList.add('active');
+            renderCards();
+        }
+
+        function toggleAddPanel() {
+            document.getElementById('add-panel').classList.toggle('show');
+        }
+
+        function addRecord() {
+            const batch = document.getElementById('f-batch').value.trim();
+            const mod = document.getElementById('f-module').value.trim();
+            const prev = document.getElementById('f-prev').value.trim();
+            const inc = document.getElementById('f-new').value.trim();
+            const first = document.getElementById('f-first').value;
+            const last = document.getElementById('f-last').value;
+            if (!batch || !mod || !prev || !inc || !first) { toast('Please fill batch, module, both instructors, and first class date'); return; }
+
+            // merge into existing batchset if key matches, else create new
+            const key = [mod, prev, inc, first].join('||');
+            const existing = batchsets.find(b => b.key === key);
+            if (existing) {
+                if (!existing.batches.includes(batch)) existing.batches.push(batch);
+                toast('Added to existing batchset: ' + mod);
+            } else {
+                const days = daysTo(first);
+                batchsets.push({ key, module: mod, prevInstructor: prev, instructor: inc, firstClass: first, lastClass: last, days, urg: urgency(days), batches: [batch] });
+                toast('New batchset created');
+            }
+            ['f-batch', 'f-module', 'f-prev', 'f-new', 'f-first', 'f-last', 'f-classes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+            toggleAddPanel();
+            renderAll();
+        }
+
+        function removeBS(i) { batchsets.splice(i, 1); renderAll(); toast('Batchset removed'); }
+
+        function previewSlack(filtIdx) {
+            const b = (window._filtered || batchsets)[filtIdx];
+            previewBS = b;
+            const dLabel = b.days < 0 ? Math.abs(b.days) + 'd ago' : b.days + 'd away';
+            document.getElementById('slack-preview').innerHTML = `
+    <div class="slack-bot"><strong>Instructor Monitor</strong>  Today ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+    <div class="slack-title">Instructor change alert — action needed</div>
+    <div class="slack-body">@you  1 batchset change in <strong style="color:#fff">${b.days} days</strong>. Please action next steps.</div>
+    <div class="slack-fields">
+      <div><div class="sf-label">Module</div><div class="sf-value">${b.module}</div></div>
+      <div><div class="sf-label">Days to first class</div><div class="sf-value" style="color:${b.days <= 7 ? '#f87171' : b.days <= 14 ? '#fbbf24' : '#34d399'}">${dLabel}</div></div>
+      <div><div class="sf-label">Outgoing instructor</div><div class="sf-value">${b.prevInstructor}</div></div>
+      <div><div class="sf-label">Incoming instructor</div><div class="sf-value">${b.instructor}</div></div>
+      <div><div class="sf-label">First class date</div><div class="sf-value">${fmtDate(b.firstClass)}</div></div>
+      <div><div class="sf-label">Batches (${b.batches.length})</div><div class="sf-value">${b.batches.length} batches</div></div>
+    </div>
+    <div class="slack-batches">
+      <div class="sf-label" style="margin-bottom:5px">Batch list</div>
+      ${b.batches.map(x => `<span class="slack-batch-tag">${x}</span>`).join('')}
+    </div>
+  `;
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+        function sendSlack() {
+            const hook = document.getElementById('webhook-input').value.trim();
+            if (!hook) { toast('Add a Slack webhook URL in the sidebar'); return; }
+            if (!previewBS) return;
+            const b = previewBS;
+            fetch(hook, {
+                method: 'POST',
+                body: JSON.stringify({
+                    text: `*Instructor change — ${b.module}*\n${b.prevInstructor} → ${b.instructor}\nFirst class: ${fmtDate(b.firstClass)} (${b.days}d)\nBatches (${b.batches.length}): ${b.batches.join(', ')}`,
+                })
+            }).then(() => { toast('Sent to Slack!'); closeModal(); })
+                .catch(() => { toast('Slack send failed — check webhook URL'); });
+        }
+
+        function simulateSlackAll() {
+            const urgent = batchsets.filter(b => b.days >= 0 && b.days <= 14);
+            if (!urgent.length) { toast('No urgent batchsets (≤14 days) to alert'); return; }
+            toast(`Would alert ${urgent.length} batchset(s) — ${urgent.reduce((s, b) => s + b.batches.length, 0)} batches total`);
+        }
+
+        function simulateToday() {
+            const due = batchsets.filter(b => b.days === 14);
+            if (!due.length) { toast('No batchsets exactly 14 days away today'); return; }
+            const lines = due.map(b => `• ${b.module} (${b.batches.length} batches) · ${b.prevInstructor} → ${b.instructor}`).join('\n');
+            alert("TODAY'S T-14 TRIGGER WOULD FIRE:\n\n" + lines);
+        }
+
+        function exportCSV() {
+            const rows = [['instructor_email', 'super_batch_name', 'module_name', 'classes_taken', 'last_class_taken_at', 'first_class_taken_at', 'rnk', 'prev_module_instructor']];
+            batchsets.forEach(b => b.batches.forEach(batch => {
+                rows.push([b.instructor, batch, b.module, '', b.lastClass, b.firstClass, 1, b.prevInstructor]);
+            }));
+            const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+            a.download = 'instructor_changes.csv'; a.click();
+            toast('CSV exported');
+        }
+
+        function importCSV() { document.getElementById('csv-file').click(); }
+
+        function handleCSV(e) {
+            const file = e.target.files[0]; if (!file) return;
+            e.target.value = '';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            toast('Uploading CSV…');
+
+            fetch('/api/upload-csv', { method: 'POST', body: formData })
+                .then(res => {
+                    if (!res.ok) return res.json().then(d => { throw new Error(d.detail || 'Server error ' + res.status); });
+                    return res.json();
+                })
+                .then(data => {
+                    const rawRows = data.rows;
+                    batchsets = groupRows(rawRows);
+                    renderAll();
+                    toast('Imported ' + rawRows.length + ' rows → ' + batchsets.length + ' batchsets');
+                })
+                .catch(err => {
+                    // Graceful fallback: if API is unreachable, parse client-side
+                    console.warn('API unavailable, falling back to client-side parse:', err);
+                    _handleCSVClientSide(file);
+                });
+        }
+
+        function _handleCSVClientSide(file) {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const lines = ev.target.result.split('\n').filter(Boolean);
+                const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+                const ci = k => headers.findIndex(h => h.includes(k));
+                const iE = ci('instructor_email'), iB = ci('super_batch'), iM = ci('module_name'),
+                      iLa = ci('last_class'), iF = ci('first_class'), iP = ci('prev');
+                const rawRows = [];
+                lines.slice(1).forEach(line => {
+                    const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
+                    const prev = cols[iP] || ''; if (!prev) return;
+                    rawRows.push({
+                        batch: cols[iB], module: cols[iM], prev, incoming: cols[iE],
+                        firstClass: cols[iF] ? new Date(cols[iF]).toISOString().slice(0, 10) : '',
+                        lastClass: cols[iLa] ? new Date(cols[iLa]).toISOString().slice(0, 10) : '',
+                    });
+                });
+                batchsets = groupRows(rawRows);
+                renderAll();
+                toast('Imported (offline) ' + (lines.length - 1) + ' rows → ' + batchsets.length + ' batchsets');
+            };
+            reader.readAsText(file);
+        }
+
+        function saveWebhook() { try { localStorage.setItem('slack_webhook', document.getElementById('webhook-input').value); } catch (e) { } }
+
+        function toast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2800);
+        }
+
+        document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
+        try { const w = localStorage.getItem('slack_webhook'); if (w) document.getElementById('webhook-input').value = w; } catch (e) { }
+
+        renderAll();
+    </script>
+</body>
+
+</html>
