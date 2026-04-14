@@ -1,3 +1,6 @@
 fastapi
 python-multipart
 mangum
+supabase
+gspread
+google-auth

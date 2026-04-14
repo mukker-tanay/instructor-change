@@ -925,6 +925,13 @@
                     </svg>
                     Add record
                 </button>
+                <button class="nav-item" id="sync-btn" onclick="syncSheet()">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Sync from Sheet
+                </button>
                 <button class="nav-item" onclick="importCSV()">
                     <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -1346,7 +1353,45 @@
         document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
         try { const w = localStorage.getItem('slack_webhook'); if (w) document.getElementById('webhook-input').value = w; } catch (e) { }
 
+        // ── Supabase / Sheet integration ───────────────────────────────────
+
+        function loadFromSupabase() {
+            fetch('/api/rows')
+                .then(res => { if (!res.ok) throw new Error('api/rows ' + res.status); return res.json(); })
+                .then(data => {
+                    if (data.rows && data.rows.length) {
+                        batchsets = groupRows(data.rows);
+                        renderAll();
+                        toast('Loaded ' + data.rows.length + ' rows from Supabase → ' + batchsets.length + ' batchsets');
+                    }
+                })
+                .catch(err => console.info('Supabase not configured or unavailable:', err));
+        }
+
+        function syncSheet() {
+            const btn = document.getElementById('sync-btn');
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+            toast('Syncing from Google Sheet…');
+
+            fetch('/api/sync', { method: 'POST' })
+                .then(res => { if (!res.ok) return res.json().then(d => { throw new Error(d.detail || 'Sync failed'); }); return res.json(); })
+                .then(data => {
+                    toast('Synced ' + data.synced + ' rows from Sheet — refreshing…');
+                    return fetch('/api/rows');
+                })
+                .then(res => res.json())
+                .then(data => {
+                    batchsets = groupRows(data.rows);
+                    renderAll();
+                    toast('✓ ' + data.rows.length + ' rows loaded → ' + batchsets.length + ' batchsets');
+                })
+                .catch(err => toast('Sync error: ' + err.message))
+                .finally(() => { btn.style.opacity = ''; btn.style.pointerEvents = ''; });
+        }
+
         renderAll();
+        loadFromSupabase();   // auto-load persisted data on page open
     </script>
 </body>
 
