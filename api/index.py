@@ -198,7 +198,7 @@ async def sync_from_sheet():
         raise HTTPException(status_code=502, detail=f"Failed to open sheet '{sheet_id}'. Is the sheet shared with the service account? Error: {e}")
 
     try:
-        worksheet = sh.worksheet("dump")
+        worksheet = sh.worksheet("Data")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Tab 'dump' not found in the sheet. Available tabs: {[ws.title for ws in sh.worksheets()]}. Error: {e}")
 
