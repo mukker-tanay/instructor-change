@@ -1,5 +1,11 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/slack-alerts",
+      "schedule": "30 3 * * *"
+    }
   ]
 }

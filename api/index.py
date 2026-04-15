@@ -2,7 +2,9 @@ import csv
 import io
 import json
 import os
-from fastapi import FastAPI, File, UploadFile, HTTPException
+import urllib.request
+import urllib.error
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from mangum import Mangum
@@ -200,7 +202,7 @@ async def sync_from_sheet():
     try:
         worksheet = sh.worksheet("Data")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Tab 'dump' not found in the sheet. Available tabs: {[ws.title for ws in sh.worksheets()]}. Error: {e}")
+        raise HTTPException(status_code=502, detail=f"Tab 'Data' not found in the sheet. Available tabs: {[ws.title for ws in sh.worksheets()]}. Error: {e}")
 
     try:
         records = worksheet.get_all_records()
@@ -295,8 +297,116 @@ async def debug_config():
 
     return JSONResponse(content=checks)
 
+# ---------------------------------------------------------------------------
+# GET /api/cron/slack-alerts  — Vercel Cron endpoint to run daily
+# ---------------------------------------------------------------------------
+@app.get("/api/cron/slack-alerts")
+@app.post("/api/cron/slack-alerts")
+async def trigger_slack_alerts(authorization: str = Header(None)):
+    # Standard Vercel Cron authorization check
+    cron_secret = os.environ.get("CRON_SECRET")
+    if cron_secret and authorization != f"Bearer {cron_secret}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
+    if not webhook_url:
+        raise HTTPException(status_code=500, detail="SLACK_WEBHOOK_URL not configured.")
+
+    try:
+        sb = _get_supabase()
+        result = sb.table("instructor_changes").select("*").execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Supabase read failed: {e}")
+
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Group rows dynamically like the frontend
+    grouped = {}
+    for r in result.data:
+        module = r.get("module", "")
+        prev = r.get("prev_instructor", "")
+        incoming = r.get("incoming_instructor", "")
+        first_class_str = r.get("first_class", "")
+        batch = r.get("batch", "")
+        
+        if not first_class_str:
+            continue
+            
+        key = f"{module}||{prev}||{incoming}||{first_class_str}"
+        if key not in grouped:
+            try:
+                first_date = datetime.strptime(first_class_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                days_away = (first_date - today).days
+            except ValueError:
+                continue
+            
+            grouped[key] = {
+                "module": module,
+                "prev": prev,
+                "incoming": incoming,
+                "first_class": first_class_str,
+                "days": days_away,
+                "batches": []
+            }
+        grouped[key]["batches"].append(batch)
+
+    # Find T-14 and T-7 batches
+    t14_alerts = []
+    t7_alerts = []
+
+    for group in grouped.values():
+        if group["days"] == 14:
+            t14_alerts.append(group)
+        elif group["days"] == 7:
+            t7_alerts.append(group)
+
+    if not t14_alerts and not t7_alerts:
+        return JSONResponse(content={"message": "No T-14 or T-7 alerts to send today."})
+
+    # Build the Slack message payload
+    blocks = [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "🚨 Instructor Change Alerts"
+            }
+        }
+    ]
+
+    def _format_section(title, alerts):
+        if not alerts: return []
+        lines = [f"*{title}*"]
+        for a in alerts:
+            lines.append(f"• *{a['module']}* | {a['prev']} ➡️ {a['incoming']}")
+            lines.append(f"  _Batches ({len(a['batches'])}):_ {', '.join(a['batches'])}")
+        return [{"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}}]
+
+    if t7_alerts:
+        blocks.extend(_format_section("🟥 CRITICAL: Exactly 7 days away (T-7)", t7_alerts))
+        blocks.append({"type": "divider"})
+    if t14_alerts:
+        blocks.extend(_format_section("🟨 URGENT: Exactly 14 days away (T-14)", t14_alerts))
+
+    payload = {"blocks": blocks}
+
+    req = urllib.request.Request(
+        webhook_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req) as response:
+            res_body = response.read()
+    except urllib.error.URLError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to post to Slack: {e}")
+
+    return JSONResponse(content={"t14_count": len(t14_alerts), "t7_count": len(t7_alerts), "status": "Slack message sent"})
 
 # ---------------------------------------------------------------------------
 # Vercel / Lambda entrypoint
+
 # ---------------------------------------------------------------------------
 handler = Mangum(app)
