@@ -349,10 +349,14 @@ async def _send_alerts_logic():
     t7_alerts = []
 
     for group in grouped.values():
-        if group["days"] == 14:
+        if 7 < group["days"] <= 14:
             t14_alerts.append(group)
-        elif group["days"] == 7:
+        elif 0 <= group["days"] <= 7:
             t7_alerts.append(group)
+
+    # Sort alerts by urgency (closest days first)
+    t14_alerts.sort(key=lambda x: x["days"])
+    t7_alerts.sort(key=lambda x: x["days"])
 
     if not t14_alerts and not t7_alerts:
         return JSONResponse(content={"message": "No T-14 or T-7 alerts to send today."})
@@ -372,15 +376,16 @@ async def _send_alerts_logic():
         if not alerts: return []
         lines = [f"*{title}*"]
         for a in alerts:
-            lines.append(f"• *{a['module']}* | {a['prev']} ➡️ {a['incoming']}")
+            # Added ({a['days']} days) to indicate the exact days away
+            lines.append(f"• *{a['module']}* | {a['prev']} ➡️ {a['incoming']} _({a['days']} days)_")
             lines.append(f"  _Batches ({len(a['batches'])}):_ {', '.join(a['batches'])}")
         return [{"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}}]
 
     if t7_alerts:
-        blocks.extend(_format_section("🟥 CRITICAL: Exactly 7 days away (T-7)", t7_alerts))
+        blocks.extend(_format_section("🟥 CRITICAL: ≤ 7 days away", t7_alerts))
         blocks.append({"type": "divider"})
     if t14_alerts:
-        blocks.extend(_format_section("🟨 URGENT: Exactly 14 days away (T-14)", t14_alerts))
+        blocks.extend(_format_section("🟨 URGENT: 8 to 14 days away", t14_alerts))
 
     payload = {"blocks": blocks}
 
