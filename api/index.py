@@ -322,8 +322,10 @@ async def _send_alerts_logic():
         incoming = r.get("incoming_instructor", "")
         first_class_str = r.get("first_class", "")
         batch = r.get("batch", "")
+        acknowledged = r.get("acknowledged", False)
         
-        if not first_class_str:
+        # Don't alert if first_class is empty or if it's already acknowledged
+        if not first_class_str or acknowledged:
             continue
             
         key = f"{module}||{prev}||{incoming}||{first_class_str}"
@@ -335,6 +337,7 @@ async def _send_alerts_logic():
                 continue
             
             grouped[key] = {
+                "key": key,
                 "module": module,
                 "prev": prev,
                 "incoming": incoming,
@@ -344,64 +347,72 @@ async def _send_alerts_logic():
             }
         grouped[key]["batches"].append(batch)
 
-    # Find T-14 and T-7 batches
-    t14_alerts = []
-    t7_alerts = []
+    t14_groups = []
+    t7_groups = []
 
     for group in grouped.values():
         if 7 < group["days"] <= 14:
-            t14_alerts.append(group)
+            t14_groups.append(group)
         elif 0 <= group["days"] <= 7:
-            t7_alerts.append(group)
+            t7_groups.append(group)
 
     # Sort alerts by urgency (closest days first)
-    t14_alerts.sort(key=lambda x: x["days"])
-    t7_alerts.sort(key=lambda x: x["days"])
+    t14_groups.sort(key=lambda x: x["days"])
+    t7_groups.sort(key=lambda x: x["days"])
 
-    if not t14_alerts and not t7_alerts:
+    if not t14_groups and not t7_groups:
         return JSONResponse(content={"message": "No T-14 or T-7 alerts to send today."})
 
-    # Build the Slack message payload
-    blocks = [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "🚨 Instructor Change Alerts"
+    def _send_single_alert(group, title_prefix):
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": title_prefix
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"• *{group['module']}* | {group['prev']} ➡️ {group['incoming']} _({group['days']} days)_\n  _Batches ({len(group['batches'])}):_ {', '.join(group['batches'])}"
+                }
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "✅ Acknowledge & Mute"
+                        },
+                        "style": "primary",
+                        "action_id": "btn_acknowledge",
+                        "value": group["key"]
+                    }
+                ]
             }
-        }
-    ]
+        ]
+        
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps({"blocks": blocks}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urllib.request.urlopen(req)
+        except Exception as e:
+            pass
 
-    def _format_section(title, alerts):
-        if not alerts: return []
-        lines = [f"*{title}*"]
-        for a in alerts:
-            # Added ({a['days']} days) to indicate the exact days away
-            lines.append(f"• *{a['module']}* | {a['prev']} ➡️ {a['incoming']} _({a['days']} days)_")
-            lines.append(f"  _Batches ({len(a['batches'])}):_ {', '.join(a['batches'])}")
-        return [{"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}}]
+    for g in t7_groups:
+        _send_single_alert(g, "🟥 CRITICAL: ≤ 7 days away")
+    for g in t14_groups:
+        _send_single_alert(g, "🟨 URGENT: 8 to 14 days away")
 
-    if t7_alerts:
-        blocks.extend(_format_section("🟥 CRITICAL: ≤ 7 days away", t7_alerts))
-        blocks.append({"type": "divider"})
-    if t14_alerts:
-        blocks.extend(_format_section("🟨 URGENT: 8 to 14 days away", t14_alerts))
-
-    payload = {"blocks": blocks}
-
-    req = urllib.request.Request(
-        webhook_url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req) as response:
-            res_body = response.read()
-    except urllib.error.URLError as e:
-        raise HTTPException(status_code=502, detail=f"Failed to post to Slack: {e}")
-
-    return JSONResponse(content={"t14_count": len(t14_alerts), "t7_count": len(t7_alerts), "status": "Slack message sent"})
+    return JSONResponse(content={"t14_count": len(t14_groups), "t7_count": len(t7_groups), "status": "Slack messages sent"})
 
 @app.get("/api/cron/slack-alerts")
 @app.post("/api/cron/slack-alerts")
@@ -416,6 +427,85 @@ async def trigger_slack_alerts(authorization: str = Header(None)):
 @app.post("/api/manual-slack-alerts")
 async def manual_slack_alerts():
     return await _send_alerts_logic()
+
+from fastapi import Request
+
+@app.post("/api/slack/interactive")
+async def slack_interactive(request: Request):
+    """
+    Receives button clicks from Slack. Needs to be configured in the Slack App
+    under 'Interactivity & Shortcuts' -> 'Request URL'.
+    """
+    form_data = await request.form()
+    payload_str = form_data.get("payload")
+    if not payload_str:
+        return JSONResponse(content={"error": "Missing payload"}, status_code=400)
+        
+    try:
+        payload = json.loads(payload_str)
+    except json.JSONDecodeError:
+        return JSONResponse(content={"error": "Invalid JSON"}, status_code=400)
+        
+    actions = payload.get("actions", [])
+    if not actions:
+        return JSONResponse(content={})
+        
+    action = actions[0]
+    if action.get("action_id") == "btn_acknowledge":
+        key = action.get("value")
+        if key:
+            parts = key.split("||")
+            if len(parts) == 4:
+                module, prev, incoming, first_class = parts
+                
+                # Update Supabase
+                try:
+                    sb = _get_supabase()
+                    sb.table("instructor_changes").update({"acknowledged": True})\
+                      .eq("module", module)\
+                      .eq("prev_instructor", prev)\
+                      .eq("incoming_instructor", incoming)\
+                      .eq("first_class", first_class)\
+                      .execute()
+                except Exception as e:
+                    print(f"Failed to update db: {e}")
+                    
+        # Extract user who clicked
+        user_name = payload.get("user", {}).get("username", "Someone")
+        
+        original_blocks = payload.get("message", {}).get("blocks", [])
+        
+        # Replace the actions block with a context indicating it's done
+        new_blocks = []
+        for b in original_blocks:
+            if b.get("type") == "actions":
+                new_blocks.append({
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"✅ _Acknowledged by @{user_name}_"
+                        }
+                    ]
+                })
+            else:
+                new_blocks.append(b)
+                
+        # Send update directly to response_url (Slack specific seamless update)
+        response_url = payload.get("response_url")
+        if response_url:
+            req = urllib.request.Request(
+                response_url,
+                data=json.dumps({"replace_original": True, "blocks": new_blocks}).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                urllib.request.urlopen(req)
+            except Exception as e:
+                pass
+                
+    return JSONResponse(content={})
 
 # ---------------------------------------------------------------------------
 # Vercel / Lambda entrypoint

@@ -8,7 +8,8 @@ create table instructor_changes (
   incoming_instructor text        not null,
   first_class         date,
   last_class          date,
-  synced_at           timestamptz default now()
+  synced_at           timestamptz default now(),
+  acknowledged        boolean     default false
 );
 
 -- Unique constraint used for upsert (prevents duplicates on re-sync)
