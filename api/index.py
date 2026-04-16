@@ -300,14 +300,7 @@ async def debug_config():
 # ---------------------------------------------------------------------------
 # GET /api/cron/slack-alerts  — Vercel Cron endpoint to run daily
 # ---------------------------------------------------------------------------
-@app.get("/api/cron/slack-alerts")
-@app.post("/api/cron/slack-alerts")
-async def trigger_slack_alerts(authorization: str = Header(None)):
-    # Standard Vercel Cron authorization check
-    cron_secret = os.environ.get("CRON_SECRET")
-    if cron_secret and authorization != f"Bearer {cron_secret}":
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
+async def _send_alerts_logic():
     webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
     if not webhook_url:
         raise HTTPException(status_code=500, detail="SLACK_WEBHOOK_URL not configured.")
@@ -404,6 +397,20 @@ async def trigger_slack_alerts(authorization: str = Header(None)):
         raise HTTPException(status_code=502, detail=f"Failed to post to Slack: {e}")
 
     return JSONResponse(content={"t14_count": len(t14_alerts), "t7_count": len(t7_alerts), "status": "Slack message sent"})
+
+@app.get("/api/cron/slack-alerts")
+@app.post("/api/cron/slack-alerts")
+async def trigger_slack_alerts(authorization: str = Header(None)):
+    # Standard Vercel Cron authorization check
+    cron_secret = os.environ.get("CRON_SECRET")
+    if cron_secret and authorization != f"Bearer {cron_secret}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    return await _send_alerts_logic()
+
+@app.post("/api/manual-slack-alerts")
+async def manual_slack_alerts():
+    return await _send_alerts_logic()
 
 # ---------------------------------------------------------------------------
 # Vercel / Lambda entrypoint

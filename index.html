@@ -971,7 +971,7 @@
                 </div>
                 <div class="head-actions">
                     <button class="btn" onclick="loadSample()">Load sample data</button>
-                    <button class="btn slack" onclick="simulateSlackAll()">Send Slack alerts</button>
+                    <button class="btn slack" id="btn-slack-all" onclick="sendSlackAll()">Send Slack alerts</button>
                 </div>
             </div>
 
@@ -1263,10 +1263,26 @@
                 .catch(() => { toast('Slack send failed — check webhook URL'); });
         }
 
-        function simulateSlackAll() {
-            const urgent = batchsets.filter(b => b.days >= 0 && b.days <= 14);
-            if (!urgent.length) { toast('No urgent batchsets (≤14 days) to alert'); return; }
-            toast(`Would alert ${urgent.length} batchset(s) — ${urgent.reduce((s, b) => s + b.batches.length, 0)} batches total`);
+        function sendSlackAll() {
+            const btn = document.getElementById('btn-slack-all');
+            const origText = btn.textContent;
+            btn.textContent = 'Sending...';
+            btn.style.pointerEvents = 'none';
+
+            fetch('/api/manual-slack-alerts', { method: 'POST' })
+                .then(res => res.json().then(d => { if (!res.ok) throw new Error(d.detail || 'Error'); return d; }))
+                .then(data => {
+                    if (data.message) {
+                        toast(data.message);
+                    } else {
+                        toast(`Alerts sent! (T-14: ${data.t14_count}, T-7: ${data.t7_count})`);
+                    }
+                })
+                .catch(err => { toast('Failed: ' + err.message); })
+                .finally(() => { 
+                    btn.textContent = origText;
+                    btn.style.pointerEvents = 'auto';
+                });
         }
 
         function simulateToday() {
